@@ -90,7 +90,7 @@ int main(int argc, char **argv)
     cout.precision(17);
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::STEREO,true);
+    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::STEREO,false);
     float imageScale = SLAM.GetImageScale();
 
     cout << endl << "-------" << endl;
@@ -109,6 +109,7 @@ int main(int argc, char **argv)
         proccIm = 0;
         for(int ni=0; ni<nImages[seq]; ni++, proccIm++)
         {
+            std::cout << "Processing image " << proccIm << " of " << tot_images << std::endl;
 
             // Read image from file
             imLeft = cv::imread(vstrImageLeftFilenames[seq][ni],cv::IMREAD_GRAYSCALE);
