@@ -1790,6 +1790,103 @@ void Tracking::ResetFrameIMU()
     // TODO To implement...
 }
 
+/*================================================*/
+void Tracking::GetTrajectory()
+{
+
+    // unique_lock<mutex> lock(mMutexState);
+
+    // Vector to save all the poses
+    vector<Eigen::Matrix4f> vPoses;
+
+    vector<Map*> vpMaps = mpAtlas->GetAllMaps();
+    int numMaxKFs = 0;
+    Map* pBiggerMap;
+    int maps = vpMaps.size();
+    for(Map* pMap :vpMaps)
+    {
+        if(pMap->GetAllKeyFrames().size() > numMaxKFs)
+        {
+            numMaxKFs = pMap->GetAllKeyFrames().size();
+            pBiggerMap = pMap;
+        }
+    }
+
+    vector<KeyFrame*> vpKFs = pBiggerMap->GetAllKeyFrames();
+    sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    Sophus::SE3f Twb; // Can be word to cam0 or world to b depending on IMU or not.
+    if (mSensor==System::IMU_MONOCULAR || mSensor==System::IMU_STEREO || mSensor==System::IMU_RGBD)
+        Twb = vpKFs[0]->GetImuPose();
+    else
+        Twb = vpKFs[0]->GetPoseInverse();
+
+    // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
+    // We need to get first the keyframe pose and then concatenate the relative transformation.
+    // Frames not localized (tracking failure) are not saved.
+
+    // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
+    // which is true when tracking failed (lbL).
+    list<ORB_SLAM3::KeyFrame*>::iterator lRit = mlpReferences.begin();
+    list<double>::iterator lT = mlFrameTimes.begin();
+    list<bool>::iterator lbL = mlbLost.begin();
+
+
+    for(auto lit=mlRelativeFramePoses.begin(),
+        lend=mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
+    {
+        if(*lbL)
+            continue;
+
+
+        KeyFrame* pKF = *lRit;
+
+        Sophus::SE3f Trw;
+
+        // If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
+        if (!pKF)
+            continue;
+
+
+        while(pKF->isBad())
+        {
+            Trw = Trw * pKF->mTcp;
+            pKF = pKF->GetParent();
+        }
+
+        if(!pKF || pKF->GetMap() != pBiggerMap)
+        {
+            continue;
+        }
+
+
+        Trw = Trw * pKF->GetPose()*Twb; // Tcp*Tpw*Twb0=Tcb0 where b0 is the new world reference
+
+
+        if (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor==System::IMU_RGBD)
+        {
+            Sophus::SE3f Twb = (pKF->mImuCalib.mTbc * (*lit) * Trw).inverse();
+            // Eigen::Quaternionf q = Twb.unit_quaternion();
+            // Eigen::Vector3f twb = Twb.translation();
+            Eigen::Matrix4f TwcMat = Twb.matrix();
+            vPoses.push_back(TwcMat);
+
+        }
+        else
+        {
+            Sophus::SE3f Twc = ((*lit)*Trw).inverse();
+            // Eigen::Quaternionf q = Twc.unit_quaternion();
+            // Eigen::Vector3f twc = Twc.translation();
+            Eigen::Matrix4f TwcMat = Twc.matrix();
+            vPoses.push_back(TwcMat);
+        }
+
+    }
+
+    mTrajectory = vPoses;
+}
 
 void Tracking::Track()
 {
@@ -2307,6 +2404,7 @@ void Tracking::Track()
             mlpReferences.push_back(mCurrentFrame.mpReferenceKF);
             mlFrameTimes.push_back(mCurrentFrame.mTimeStamp);
             mlbLost.push_back(mState==LOST);
+            GetTrajectory();
         }
         else
         {
@@ -2315,6 +2413,7 @@ void Tracking::Track()
             mlpReferences.push_back(mlpReferences.back());
             mlFrameTimes.push_back(mlFrameTimes.back());
             mlbLost.push_back(mState==LOST);
+            GetTrajectory();
         }
 
     }

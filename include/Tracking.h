@@ -108,6 +108,8 @@ public:
 
     float GetImageScale();
 
+    void GetTrajectory();
+
 #ifdef REGISTER_LOOP
     void RequestStop();
     bool isStopped();
@@ -127,6 +129,8 @@ public:
         LOST=4,
         OK_KLT=5
     };
+
+    std::vector<Eigen::Matrix4f> mTrajectory;
 
     eTrackingState mState;
     eTrackingState mLastProcessedState;

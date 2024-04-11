@@ -140,8 +140,6 @@ public:
     void Shutdown();
     bool isShutDown();
 
-    std::vector<Eigen::Matrix4f> GetCameraTrajectory();
-
     // Save camera trajectory in the TUM RGB-D dataset format.
     // Only for stereo and RGB-D. This method does not work for monocular.
     // Call first Shutdown()
@@ -178,6 +176,17 @@ public:
     int GetTrackingState();
     std::vector<MapPoint*> GetTrackedMapPoints();
     std::vector<cv::KeyPoint> GetTrackedKeyPointsUn();
+
+    // Returns the camera trajectory as vector of transformation matrices. Cannot be used in parallel with the tracking thread.
+    // Can be called only after Shutdown() has been called.
+    std::vector<Eigen::Matrix4f> GetCameraTrajectory();
+    // Get the full trajectory and Map points in the current map
+    // These can be called when the system is running
+    std::vector<Eigen::Matrix4f> GetFullTrajectory();
+    // Returns the map points in the current map
+    vector<Eigen::Matrix<float,3,1>> GetMapPoints();
+    // Returns the map points in the current map corresponding to the current frame
+    vector<Eigen::Matrix<float,3,1>> GetCurrentMapPoints();
 
     // For debugging
     double GetTimeFromIMUInit();
@@ -256,6 +265,7 @@ private:
     std::vector<MapPoint*> mTrackedMapPoints;
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
+    std::vector<Eigen::Matrix4f> mFullTrajectory;
 
     //
     string mStrLoadAtlasFromFile;

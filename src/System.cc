@@ -321,6 +321,7 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    mFullTrajectory = mpTracker->mTrajectory;
 
     return Tcw;
 }
@@ -393,6 +394,7 @@ Sophus::SE3f System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    mFullTrajectory = mpTracker->mTrajectory;
     return Tcw;
 }
 
@@ -469,11 +471,51 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
+    mFullTrajectory = mpTracker->mTrajectory;
 
     return Tcw;
 }
 
+vector<Eigen::Matrix<float,3,1>> System::GetMapPoints()
+{
 
+    vector<Eigen::Matrix<float,3,1>> mapPoints;
+    Map* pActiveMap = mpAtlas->GetCurrentMap();
+
+    if(!pActiveMap)
+        return mapPoints;
+        
+    const vector<MapPoint*> &vpMPs = pActiveMap->GetAllMapPoints();
+    
+    if(vpMPs.empty())
+        return mapPoints;
+
+    for(size_t i=0, iend=vpMPs.size(); i<iend;i++)
+    {
+        if(vpMPs[i]->isBad())
+            continue;
+        Eigen::Matrix<float,3,1> pos = vpMPs[i]->GetWorldPos();
+        mapPoints.push_back(pos);
+    }
+    return mapPoints;
+}
+
+vector<Eigen::Matrix<float,3,1>> System::GetCurrentMapPoints()
+{
+    vector<Eigen::Matrix<float,3,1>> currentMapPoints;
+    
+    if(currentMapPoints.empty())
+        return currentMapPoints;
+
+    for(size_t i=0, iend=mTrackedMapPoints.size(); i<iend;i++)
+    {
+        if(mTrackedMapPoints[i]->isBad())
+            continue;
+        Eigen::Matrix<float,3,1> pos = mTrackedMapPoints[i]->GetWorldPos();
+        currentMapPoints.push_back(pos);
+    }
+    return currentMapPoints;
+}
 
 void System::ActivateLocalizationMode()
 {
@@ -564,53 +606,6 @@ void System::Shutdown()
 bool System::isShutDown() {
     unique_lock<mutex> lock(mMutexReset);
     return mbShutDown;
-}
-
-
-vector<Eigen::Matrix4f> System::GetCameraTrajectory()
-{
-    vector<KeyFrame*> vpKFs = mpAtlas->GetAllKeyFrames();
-    sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
-
-    // Transform all keyframes so that the first keyframe is at the origin.
-    // After a loop closure the first keyframe might not be at the origin.
-    Sophus::SE3f Two = vpKFs[0]->GetPoseInverse();
-    vector<Eigen::Matrix4f> trajectory;
-    // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
-    // We need to get first the keyframe pose and then concatenate the relative transformation.
-    // Frames not localized (tracking failure) are not saved.
-
-    // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
-    // which is true when tracking failed (lbL).
-    list<ORB_SLAM3::KeyFrame*>::iterator lRit = mpTracker->mlpReferences.begin();
-    list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
-    list<bool>::iterator lbL = mpTracker->mlbLost.begin();
-    for(list<Sophus::SE3f>::iterator lit=mpTracker->mlRelativeFramePoses.begin(),
-        lend=mpTracker->mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
-    {
-        if(*lbL)
-            continue;
-
-        KeyFrame* pKF = *lRit;
-
-        Sophus::SE3f Trw;
-
-        // If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
-        while(pKF->isBad())
-        {
-            Trw = Trw * pKF->mTcp;
-            pKF = pKF->GetParent();
-        }
-
-        Trw = Trw * pKF->GetPose() * Two;
-
-        Sophus::SE3f Tcw = (*lit) * Trw;
-        Sophus::SE3f Twc = Tcw.inverse();
-
-        trajectory.push_back(Twc.matrix());
-    }
-
-    return trajectory;
 }
 
 void System::SaveTrajectoryTUM(const string &filename)
@@ -1381,6 +1376,61 @@ vector<cv::KeyPoint> System::GetTrackedKeyPointsUn()
 {
     unique_lock<mutex> lock(mMutexState);
     return mTrackedKeyPointsUn;
+}
+
+vector<Eigen::Matrix4f> System::GetCameraTrajectory()
+{
+    if(!isShutDown())
+        std::cout<<"System is not shut down, Shutdown the system first! "<<std::endl;
+        return vector<Eigen::Matrix4f>();
+
+    vector<KeyFrame*> vpKFs = mpAtlas->GetAllKeyFrames();
+    sort(vpKFs.begin(),vpKFs.end(),KeyFrame::lId);
+
+    // Transform all keyframes so that the first keyframe is at the origin.
+    // After a loop closure the first keyframe might not be at the origin.
+    Sophus::SE3f Two = vpKFs[0]->GetPoseInverse();
+    vector<Eigen::Matrix4f> trajectory;
+    // Frame pose is stored relative to its reference keyframe (which is optimized by BA and pose graph).
+    // We need to get first the keyframe pose and then concatenate the relative transformation.
+    // Frames not localized (tracking failure) are not saved.
+
+    // For each frame we have a reference keyframe (lRit), the timestamp (lT) and a flag
+    // which is true when tracking failed (lbL).
+    list<ORB_SLAM3::KeyFrame*>::iterator lRit = mpTracker->mlpReferences.begin();
+    list<double>::iterator lT = mpTracker->mlFrameTimes.begin();
+    list<bool>::iterator lbL = mpTracker->mlbLost.begin();
+    for(list<Sophus::SE3f>::iterator lit=mpTracker->mlRelativeFramePoses.begin(),
+        lend=mpTracker->mlRelativeFramePoses.end();lit!=lend;lit++, lRit++, lT++, lbL++)
+    {
+        if(*lbL)
+            continue;
+
+        KeyFrame* pKF = *lRit;
+
+        Sophus::SE3f Trw;
+
+        // If the reference keyframe was culled, traverse the spanning tree to get a suitable keyframe.
+        while(pKF->isBad())
+        {
+            Trw = Trw * pKF->mTcp;
+            pKF = pKF->GetParent();
+        }
+
+        Trw = Trw * pKF->GetPose() * Two;
+
+        Sophus::SE3f Tcw = (*lit) * Trw;
+        Sophus::SE3f Twc = Tcw.inverse();
+
+        trajectory.push_back(Twc.matrix());
+    }
+
+    return trajectory;
+}
+
+std::vector<Eigen::Matrix4f> System::GetFullTrajectory(){
+    unique_lock<mutex> lock(mMutexState);
+    return mFullTrajectory;
 }
 
 double System::GetTimeFromIMUInit()
