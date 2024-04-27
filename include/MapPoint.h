@@ -107,12 +107,15 @@ public:
     EIGEN_MAKE_ALIGNED_OPERATOR_NEW
     MapPoint();
 
-    MapPoint(const Eigen::Vector3f &Pos, KeyFrame* pRefKF, Map* pMap);
+    MapPoint(const Eigen::Vector3f &Pos, const Eigen::Vector3f &Color, KeyFrame* pRefKF, Map* pMap);
     MapPoint(const double invDepth, cv::Point2f uv_init, KeyFrame* pRefKF, KeyFrame* pHostKF, Map* pMap);
     MapPoint(const Eigen::Vector3f &Pos,  Map* pMap, Frame* pFrame, const int &idxF);
 
     void SetWorldPos(const Eigen::Vector3f &Pos);
     Eigen::Vector3f GetWorldPos();
+
+    void SetColorRGB(const Eigen::Vector3f &Color);
+    Eigen::Vector3f GetColorRGB();
 
     Eigen::Vector3f GetNormal();
     void SetNormalVector(const Eigen::Vector3f& normal);
@@ -211,6 +214,8 @@ protected:
 
      // Position in absolute coordinates
      Eigen::Vector3f mWorldPos;
+     // Color for gaussian initialization
+     Eigen::Vector3f mColorRGB;
 
      // Keyframes observing the point and associated index in keyframe
      std::map<KeyFrame*,std::tuple<int,int> > mObservations;

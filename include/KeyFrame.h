@@ -259,7 +259,7 @@ public:
 
     // KeyPoint functions
     std::vector<size_t> GetFeaturesInArea(const float &x, const float  &y, const float  &r, const bool bRight = false) const;
-    bool UnprojectStereo(int i, Eigen::Vector3f &x3D);
+    bool UnprojectStereo(int i, Eigen::Vector3f &x3D, Eigen::Vector3f &colorRGB);
 
     // Image
     bool IsInImage(const float &x, const float &y) const;
@@ -423,6 +423,9 @@ public:
 
     //bool mbHasHessian;
     //cv::Mat mHessianPose;
+
+    // RGB Image
+    cv::Mat imgLeftRGB;
 
     // The following variables need to be accessed trough a mutex to be thread safe.
 protected:

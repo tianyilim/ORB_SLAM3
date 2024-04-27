@@ -184,9 +184,17 @@ public:
     // These can be called when the system is running
     std::vector<Eigen::Matrix4f> GetFullTrajectory();
     // Returns the map points in the current map
-    vector<Eigen::Matrix<float,3,1>> GetMapPoints();
+    vector<Eigen::Matrix<float,7,1>> GetMapPoints();
     // Returns the map points in the current map corresponding to the current frame
-    vector<Eigen::Matrix<float,3,1>> GetCurrentMapPoints();
+    vector<Eigen::Matrix<float,7,1>> GetCurrentMapPoints();
+    // Get number of keyframes in the current map
+    int GetNumKeyFrames();
+    // Get Frame id corresponding to keyFrame ids
+    std::vector<std::vector<int>> GetKeyFrameIds();
+    // Get covisible keyframes for a given keyframe
+    std::vector<int> GetCovisibleKeyFrames(int KeyframeId, int NumKeyFrames);
+    // Get latest Keyframe Id
+    int GetLatestKeyFrameId();
 
     // For debugging
     double GetTimeFromIMUInit();

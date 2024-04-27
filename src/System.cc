@@ -472,14 +472,13 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
     mFullTrajectory = mpTracker->mTrajectory;
-
     return Tcw;
 }
 
-vector<Eigen::Matrix<float,3,1>> System::GetMapPoints()
+vector<Eigen::Matrix<float,7,1>> System::GetMapPoints()
 {
 
-    vector<Eigen::Matrix<float,3,1>> mapPoints;
+    vector<Eigen::Matrix<float,7,1>> mapPoints;
     Map* pActiveMap = mpAtlas->GetCurrentMap();
 
     if(!pActiveMap)
@@ -492,29 +491,86 @@ vector<Eigen::Matrix<float,3,1>> System::GetMapPoints()
 
     for(size_t i=0, iend=vpMPs.size(); i<iend;i++)
     {
+        Eigen::Matrix<float,7,1> mp;
         if(vpMPs[i]->isBad())
             continue;
-        Eigen::Matrix<float,3,1> pos = vpMPs[i]->GetWorldPos();
-        mapPoints.push_back(pos);
+        int id = vpMPs[i]->mnId;
+        Eigen::Vector3f pos = vpMPs[i]->GetWorldPos();
+        Eigen::Vector3f mColorRGB = vpMPs[i]->GetColorRGB();
+        // Id, X, Y, Z, R, G, B
+        mp << id, pos(0), pos(1), pos(2), mColorRGB(0), mColorRGB(1), mColorRGB(2);
+        mapPoints.push_back(mp);
     }
     return mapPoints;
 }
 
-vector<Eigen::Matrix<float,3,1>> System::GetCurrentMapPoints()
+vector<Eigen::Matrix<float,7,1>> System::GetCurrentMapPoints()
 {
-    vector<Eigen::Matrix<float,3,1>> currentMapPoints;
-    
-    if(currentMapPoints.empty())
+    vector<Eigen::Matrix<float,7,1>> currentMapPoints;
+    Map* pActiveMap = mpAtlas->GetCurrentMap();
+
+    if(!pActiveMap)
         return currentMapPoints;
 
-    for(size_t i=0, iend=mTrackedMapPoints.size(); i<iend;i++)
+    const vector<MapPoint*> &vpMPs = pActiveMap->GetReferenceMapPoints();
+
+    set<MapPoint*> spRefMPs(vpMPs.begin(), vpMPs.end());
+    
+    if(spRefMPs.empty())
+        return currentMapPoints;
+    
+    for(set<MapPoint*>::iterator sit=spRefMPs.begin(), send=spRefMPs.end(); sit!=send; sit++)
     {
-        if(mTrackedMapPoints[i]->isBad())
+        Eigen::Matrix<float,7,1> mp;
+        if((*sit)->isBad())
             continue;
-        Eigen::Matrix<float,3,1> pos = mTrackedMapPoints[i]->GetWorldPos();
-        currentMapPoints.push_back(pos);
+        int id = (*sit)->mnId;
+        // std::cout<<"Getting point ID: "<<id<<std::endl;
+        Eigen::Vector3f pos = (*sit)->GetWorldPos();
+        // std::cout<<"Getting point Pos"<<pos<<std::endl;
+        Eigen::Vector3f mColorRGB = (*sit)->GetColorRGB();
+        // std::cout<<"Getting point color"<<mColorRGB<<std::endl;
+        // Id, X, Y, Z, R, G, B
+        mp << id, pos(0), pos(1), pos(2), mColorRGB(0), mColorRGB(1), mColorRGB(2);
+        currentMapPoints.push_back(mp);
     }
     return currentMapPoints;
+}
+
+int System::GetNumKeyFrames()
+{
+    return mpAtlas->GetAllKeyFrames().size();
+}
+
+std::vector<std::vector<int>> System::GetKeyFrameIds()
+{
+    std::vector<std::vector<int>> keyFrameIds;
+    std::vector<KeyFrame*> vpKFs = mpAtlas->GetAllKeyFrames();
+    for(size_t i=0, iend=vpKFs.size(); i<iend;i++)
+    {
+        keyFrameIds.push_back({vpKFs[i]->mnId, vpKFs[i]->mnFrameId});
+    }
+    return keyFrameIds;
+}
+
+std::vector<int> System::GetCovisibleKeyFrames(int KeyframeId, int NumKeyFrames){
+    std::vector<int> FrameIds;
+    std::vector<KeyFrame*> vpKFs = mpAtlas->GetAllKeyFrames();
+    for(size_t i=0, iend=vpKFs.size(); i<iend;i++)
+    {
+        if (vpKFs[i]->mnId == KeyframeId){
+            std::vector<KeyFrame*> bestKFs= vpKFs[i]->GetBestCovisibilityKeyFrames(NumKeyFrames);
+            for(size_t j=0, jend=bestKFs.size(); j<jend;j++)
+                FrameIds.push_back(bestKFs[j]->mnFrameId);
+        }
+    }
+    return FrameIds;
+}
+
+int System::GetLatestKeyFrameId()
+{
+    Map* currentMap = mpAtlas->GetCurrentMap();
+    return currentMap->GetMaxKFid();
 }
 
 void System::ActivateLocalizationMode()

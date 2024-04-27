@@ -36,7 +36,7 @@ MapPoint::MapPoint():
     mpReplaced = static_cast<MapPoint*>(NULL);
 }
 
-MapPoint::MapPoint(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap):
+MapPoint::MapPoint(const Eigen::Vector3f &Pos, const Eigen::Vector3f &Color, KeyFrame *pRefKF, Map* pMap):
     mnFirstKFid(pRefKF->mnId), mnFirstFrame(pRefKF->mnFrameId), nObs(0), mnTrackReferenceForFrame(0),
     mnLastFrameSeen(0), mnBALocalForKF(0), mnFuseCandidateForKF(0), mnLoopPointForKF(0), mnCorrectedByKF(0),
     mnCorrectedReference(0), mnBAGlobalForKF(0), mpRefKF(pRefKF), mnVisible(1), mnFound(1), mbBad(false),
@@ -44,6 +44,8 @@ MapPoint::MapPoint(const Eigen::Vector3f &Pos, KeyFrame *pRefKF, Map* pMap):
     mnOriginMapId(pMap->GetId())
 {
     SetWorldPos(Pos);
+
+    SetColorRGB(Color);
 
     mNormalVector.setZero();
 
@@ -124,6 +126,15 @@ void MapPoint::SetWorldPos(const Eigen::Vector3f &Pos) {
 Eigen::Vector3f MapPoint::GetWorldPos() {
     unique_lock<mutex> lock(mMutexPos);
     return mWorldPos;
+}
+
+void MapPoint::SetColorRGB(const Eigen::Vector3f &Color) {
+    unique_lock<mutex> lock2(mGlobalMutex);
+    mColorRGB = Color;
+}
+
+Eigen::Vector3f MapPoint::GetColorRGB() {
+    return mColorRGB;
 }
 
 Eigen::Vector3f MapPoint::GetNormal() {

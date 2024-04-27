@@ -575,7 +575,7 @@ void LocalMapping::CreateNewMapPoints()
             
             cosParallaxStereo = min(cosParallaxStereo1,cosParallaxStereo2);
 
-            Eigen::Vector3f x3D;
+            Eigen::Vector3f x3D, colorRGB;
 
             bool goodProj = false;
             bool bPointStereo = false;
@@ -584,19 +584,29 @@ void LocalMapping::CreateNewMapPoints()
             {
                 goodProj = GeometricTools::Triangulate(xn1, xn2, eigTcw1, eigTcw2, x3D);
                 if(!goodProj)
-                    continue;
+                    continue;          
+                if (mpCurrentKeyFrame->NLeft == -1)
+                {
+                    const cv::KeyPoint &kp1Ori = mpCurrentKeyFrame->mvKeys[idx1];
+                    const int u = static_cast<int>(std::round(kp1Ori.pt.x));
+                    const int v = static_cast<int>(std::round(kp1Ori.pt.y));
+                    const auto& color = mpCurrentKeyFrame->imgLeftRGB.at<cv::Vec3f>(v, u);
+                    colorRGB.x() = color[0];
+                    colorRGB.y() = color[1];
+                    colorRGB.z() = color[2];
+                }
             }
             else if(bStereo1 && cosParallaxStereo1<cosParallaxStereo2)
             {
                 countStereoAttempt++;
                 bPointStereo = true;
-                goodProj = mpCurrentKeyFrame->UnprojectStereo(idx1, x3D);
+                goodProj = mpCurrentKeyFrame->UnprojectStereo(idx1, x3D, colorRGB);
             }
             else if(bStereo2 && cosParallaxStereo2<cosParallaxStereo1)
             {
                 countStereoAttempt++;
                 bPointStereo = true;
-                goodProj = pKF2->UnprojectStereo(idx2, x3D);
+                goodProj = pKF2->UnprojectStereo(idx2, x3D, colorRGB);
             }
             else
             {
@@ -691,7 +701,7 @@ void LocalMapping::CreateNewMapPoints()
                 continue;
 
             // Triangulation is succesfull
-            MapPoint* pMP = new MapPoint(x3D, mpCurrentKeyFrame, mpAtlas->GetCurrentMap());
+            MapPoint* pMP = new MapPoint(x3D, colorRGB, mpCurrentKeyFrame, mpAtlas->GetCurrentMap());
             if (bPointStereo)
                 countStereo++;
             

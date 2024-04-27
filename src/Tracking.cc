@@ -1458,44 +1458,82 @@ Sophus::SE3f Tracking::GrabImageStereo(const cv::Mat &imRectLeft, const cv::Mat 
     mImGray = imRectLeft;
     cv::Mat imGrayRight = imRectRight;
     mImRight = imRectRight;
+    cv::Mat imRightRGB;
 
     if(mImGray.channels()==3)
     {
         //cout << "Image with 3 channels" << endl;
         if(mbRGB)
         {
-            cvtColor(mImGray,mImGray,cv::COLOR_RGB2GRAY);
-            cvtColor(imGrayRight,imGrayRight,cv::COLOR_RGB2GRAY);
+            // Left
+            mImGray.copyTo(mImRGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_RGB2GRAY);
+            // Right
+            imGrayRight.copyTo(imRightRGB);
+            cvtColor(imGrayRight, imGrayRight, cv::COLOR_RGB2GRAY);
         }
         else
         {
-            cvtColor(mImGray,mImGray,cv::COLOR_BGR2GRAY);
-            cvtColor(imGrayRight,imGrayRight,cv::COLOR_BGR2GRAY);
+            // Left
+            cvtColor(mImGray, mImRGB, cv::COLOR_BGR2RGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_BGR2GRAY);
+            // Right
+            cvtColor(imGrayRight, imRightRGB, cv::COLOR_BGR2RGB);
+            cvtColor(imGrayRight, imGrayRight, cv::COLOR_BGR2GRAY);
         }
     }
-    else if(mImGray.channels()==4)
+    else if (mImGray.channels() == 4)
     {
-        //cout << "Image with 4 channels" << endl;
-        if(mbRGB)
+        // cout << "Image with 4 channels" << endl;
+        if (mbRGB)
         {
-            cvtColor(mImGray,mImGray,cv::COLOR_RGBA2GRAY);
-            cvtColor(imGrayRight,imGrayRight,cv::COLOR_RGBA2GRAY);
+            // Left
+            cvtColor(mImGray, mImRGB, cv::COLOR_RGBA2RGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_RGBA2GRAY);
+            // Right
+            cvtColor(imGrayRight, imRightRGB, cv::COLOR_RGBA2RGB);
+            cvtColor(imGrayRight, imGrayRight, cv::COLOR_RGBA2GRAY);
         }
         else
         {
-            cvtColor(mImGray,mImGray,cv::COLOR_BGRA2GRAY);
-            cvtColor(imGrayRight,imGrayRight,cv::COLOR_BGRA2GRAY);
+            // Left
+            cvtColor(mImGray, mImRGB, cv::COLOR_BGRA2RGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_BGRA2GRAY);
+            // Right
+            cvtColor(imGrayRight, imRightRGB, cv::COLOR_BGRA2RGB);
+            cvtColor(imGrayRight, imGrayRight, cv::COLOR_BGRA2GRAY);
         }
     }
+    else if(mImGray.channels() == 1)
+    {
+        // Left
+        cvtColor(mImGray, mImRGB, cv::COLOR_GRAY2RGB);
+        // Right
+        cvtColor(imGrayRight, imRightRGB, cv::COLOR_GRAY2RGB);
+    }
+
+    if (mImRGB.type() == CV_8UC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0 / 255.0);
+    else if (mImRGB.type() == CV_16UC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0 / 65535.0);
+    else if (mImRGB.type() == CV_16FC3 || mImRGB.type() == CV_64FC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0);
+
+    if (imRightRGB.type() == CV_8UC3)
+        imRightRGB.convertTo(imRightRGB, CV_32FC3, 1.0 / 255.0);
+    else if (imRightRGB.type() == CV_16UC3)
+        imRightRGB.convertTo(imRightRGB, CV_32FC3, 1.0 / 65535.0);
+    else if (imRightRGB.type() == CV_16FC3 || imRightRGB.type() == CV_64FC3)
+        imRightRGB.convertTo(imRightRGB, CV_32FC3, 1.0);
 
     //cout << "Incoming frame creation" << endl;
 
     if (mSensor == System::STEREO && !mpCamera2)
-        mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera);
+        mCurrentFrame = Frame(mImGray,imGrayRight,mImRGB,imRightRGB,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera);
     else if(mSensor == System::STEREO && mpCamera2)
         mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera,mpCamera2,mTlr);
     else if(mSensor == System::IMU_STEREO && !mpCamera2)
-        mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera,&mLastFrame,*mpImuCalib);
+        mCurrentFrame = Frame(mImGray,imGrayRight,mImRGB,imRightRGB,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera,&mLastFrame,*mpImuCalib);
     else if(mSensor == System::IMU_STEREO && mpCamera2)
         mCurrentFrame = Frame(mImGray,imGrayRight,timestamp,mpORBextractorLeft,mpORBextractorRight,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera,mpCamera2,mTlr,&mLastFrame,*mpImuCalib);
 
@@ -1525,25 +1563,48 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
     if(mImGray.channels()==3)
     {
         if(mbRGB)
+        {
+            mImGray.copyTo(mImRGB);
             cvtColor(mImGray,mImGray,cv::COLOR_RGB2GRAY);
+        }
         else
+        {
+            cvtColor(mImGray, mImRGB, cv::COLOR_BGR2RGB);
             cvtColor(mImGray,mImGray,cv::COLOR_BGR2GRAY);
+    }
     }
     else if(mImGray.channels()==4)
     {
         if(mbRGB)
+        {
+            cvtColor(mImGray, mImRGB, cv::COLOR_RGBA2RGB);
             cvtColor(mImGray,mImGray,cv::COLOR_RGBA2GRAY);
+        }
         else
+        {
+            cvtColor(mImGray, mImRGB, cv::COLOR_BGRA2RGB);
             cvtColor(mImGray,mImGray,cv::COLOR_BGRA2GRAY);
     }
+    }
+    else if(mImGray.channels()==1)
+    {
+        cvtColor(mImGray, mImRGB, cv::COLOR_GRAY2RGB);
+    }
+
+    if (mImRGB.type() == CV_8UC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0 / 255.0);
+    else if (mImRGB.type() == CV_16UC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0 / 65535.0);
+    else if (mImRGB.type() == CV_16FC3 || mImRGB.type() == CV_64FC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0);
 
     if((fabs(mDepthMapFactor-1.0f)>1e-5) || imDepth.type()!=CV_32F)
         imDepth.convertTo(imDepth,CV_32F,mDepthMapFactor);
 
     if (mSensor == System::RGBD)
-        mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera);
+        mCurrentFrame = Frame(mImGray,imDepth,mImRGB,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera);
     else if(mSensor == System::IMU_RGBD)
-        mCurrentFrame = Frame(mImGray,imDepth,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera,&mLastFrame,*mpImuCalib);
+        mCurrentFrame = Frame(mImGray,imDepth,mImRGB,timestamp,mpORBextractorLeft,mpORBVocabulary,mK,mDistCoef,mbf,mThDepth,mpCamera,&mLastFrame,*mpImuCalib);
 
 
 
@@ -1566,36 +1627,59 @@ Sophus::SE3f Tracking::GrabImageRGBD(const cv::Mat &imRGB,const cv::Mat &imD, co
 Sophus::SE3f Tracking::GrabImageMonocular(const cv::Mat &im, const double &timestamp, string filename)
 {
     mImGray = im;
-    if(mImGray.channels()==3)
+    if (mImGray.channels() == 3)
     {
-        if(mbRGB)
-            cvtColor(mImGray,mImGray,cv::COLOR_RGB2GRAY);
+        if (mbRGB)
+        {
+            mImGray.copyTo(mImRGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_RGB2GRAY);
+        }
         else
-            cvtColor(mImGray,mImGray,cv::COLOR_BGR2GRAY);
+        {
+            cvtColor(mImGray, mImRGB, cv::COLOR_BGR2RGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_BGR2GRAY);
     }
-    else if(mImGray.channels()==4)
+    }
+    else if (mImGray.channels() == 4)
     {
-        if(mbRGB)
-            cvtColor(mImGray,mImGray,cv::COLOR_RGBA2GRAY);
+        if (mbRGB)
+        {
+            cvtColor(mImGray, mImRGB, cv::COLOR_RGBA2RGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_RGBA2GRAY);
+        }
         else
-            cvtColor(mImGray,mImGray,cv::COLOR_BGRA2GRAY);
+        {
+        cvtColor(mImGray, mImRGB, cv::COLOR_BGRA2RGB);
+            cvtColor(mImGray, mImGray, cv::COLOR_BGRA2GRAY);
+        }
     }
+    else if (mImGray.channels() == 1)
+    {
+        cvtColor(mImGray, mImRGB, cv::COLOR_GRAY2RGB);
+    }
+
+    if (mImRGB.type() == CV_8UC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0 / 255.0);
+    else if (mImRGB.type() == CV_16UC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0 / 65535.0);
+    else if (mImRGB.type() == CV_16FC3 || mImRGB.type() == CV_64FC3)
+        mImRGB.convertTo(mImRGB, CV_32FC3, 1.0);
 
     if (mSensor == System::MONOCULAR)
     {
         if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET ||(lastID - initID) < mMaxFrames)
-            mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+            mCurrentFrame = Frame(mImGray,mImRGB,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
         else
-            mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
+            mCurrentFrame = Frame(mImGray,mImRGB,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth);
     }
     else if(mSensor == System::IMU_MONOCULAR)
     {
         if(mState==NOT_INITIALIZED || mState==NO_IMAGES_YET)
         {
-            mCurrentFrame = Frame(mImGray,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
+            mCurrentFrame = Frame(mImGray,mImRGB,timestamp,mpIniORBextractor,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
         }
         else
-            mCurrentFrame = Frame(mImGray,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
+            mCurrentFrame = Frame(mImGray,mImRGB,timestamp,mpORBextractorLeft,mpORBVocabulary,mpCamera,mDistCoef,mbf,mThDepth,&mLastFrame,*mpImuCalib);
     }
 
     if (mState==NO_IMAGES_YET)
@@ -2481,9 +2565,9 @@ void Tracking::StereoInitialization()
                 float z = mCurrentFrame.mvDepth[i];
                 if(z>0)
                 {
-                    Eigen::Vector3f x3D;
-                    mCurrentFrame.UnprojectStereo(i, x3D);
-                    MapPoint* pNewMP = new MapPoint(x3D, pKFini, mpAtlas->GetCurrentMap());
+                    Eigen::Vector3f x3D, colorRGB;
+                    mCurrentFrame.UnprojectStereo(i, x3D, colorRGB);
+                    MapPoint* pNewMP = new MapPoint(x3D, colorRGB, pKFini, mpAtlas->GetCurrentMap());
                     pNewMP->AddObservation(pKFini,i);
                     pKFini->AddMapPoint(pNewMP,i);
                     pNewMP->ComputeDistinctiveDescriptors();
@@ -2499,7 +2583,7 @@ void Tracking::StereoInitialization()
                 if(rightIndex != -1){
                     Eigen::Vector3f x3D = mCurrentFrame.mvStereo3Dpoints[i];
 
-                    MapPoint* pNewMP = new MapPoint(x3D, pKFini, mpAtlas->GetCurrentMap());
+                    MapPoint* pNewMP = new MapPoint(x3D, Eigen::Vector3f(.0f,.0f,.0f), pKFini, mpAtlas->GetCurrentMap());
 
                     pNewMP->AddObservation(pKFini,i);
                     pNewMP->AddObservation(pKFini,rightIndex + mCurrentFrame.Nleft);
@@ -2602,12 +2686,23 @@ void Tracking::MonocularInitialization()
 
         if(mpCamera->ReconstructWithTwoViews(mInitialFrame.mvKeysUn,mCurrentFrame.mvKeysUn,mvIniMatches,Tcw,mvIniP3D,vbTriangulated))
         {
+            mvIniColorRGB.resize(mvIniMatches.size());
             for(size_t i=0, iend=mvIniMatches.size(); i<iend;i++)
             {
                 if(mvIniMatches[i]>=0 && !vbTriangulated[i])
                 {
                     mvIniMatches[i]=-1;
                     nmatches--;
+                }
+                // Get color from mInitialFrame
+                if(mvIniMatches[i]>=0)
+                {
+                    const int u = static_cast<int>(std::round(mInitialFrame.mvKeys[i].pt.x));
+                    const int v = static_cast<int>(std::round(mInitialFrame.mvKeys[i].pt.y));
+                    const auto& color = mInitialFrame.imgLeftRGB.at<cv::Vec3f>(v, u);
+                    mvIniColorRGB[i].x() = color[0];
+                    mvIniColorRGB[i].y() = color[1];
+                    mvIniColorRGB[i].z() = color[2];
                 }
             }
 
@@ -2647,7 +2742,7 @@ void Tracking::CreateInitialMapMonocular()
         //Create MapPoint.
         Eigen::Vector3f worldPos;
         worldPos << mvIniP3D[i].x, mvIniP3D[i].y, mvIniP3D[i].z;
-        MapPoint* pMP = new MapPoint(worldPos,pKFcur,mpAtlas->GetCurrentMap());
+        MapPoint* pMP = new MapPoint(worldPos,mvIniColorRGB[i],pKFcur,mpAtlas->GetCurrentMap());
 
         pKFini->AddMapPoint(pMP,i);
         pKFcur->AddMapPoint(pMP,mvIniMatches[i]);
@@ -2924,10 +3019,10 @@ void Tracking::UpdateLastFrame()
 
         if(bCreateNew)
         {
-            Eigen::Vector3f x3D;
+            Eigen::Vector3f x3D, colorRGB; // colorRGB: actually not used because pNewMP is a temporary MapPoint, which will not be added to the Map
 
             if(mLastFrame.Nleft == -1){
-                mLastFrame.UnprojectStereo(i, x3D);
+                mLastFrame.UnprojectStereo(i, x3D, colorRGB);
             }
             else{
                 x3D = mLastFrame.UnprojectStereoFishEye(i);
@@ -3388,16 +3483,16 @@ void Tracking::CreateNewKeyFrame()
 
                 if(bCreateNew)
                 {
-                    Eigen::Vector3f x3D;
+                    Eigen::Vector3f x3D, colorRGB;
 
                     if(mCurrentFrame.Nleft == -1){
-                        mCurrentFrame.UnprojectStereo(i, x3D);
+                        mCurrentFrame.UnprojectStereo(i, x3D, colorRGB);
                     }
                     else{
                         x3D = mCurrentFrame.UnprojectStereoFishEye(i);
                     }
 
-                    MapPoint* pNewMP = new MapPoint(x3D,pKF,mpAtlas->GetCurrentMap());
+                    MapPoint* pNewMP = new MapPoint(x3D,colorRGB,pKF,mpAtlas->GetCurrentMap());
                     pNewMP->AddObservation(pKF,i);
 
                     //Check if it is a stereo observation in order to not
