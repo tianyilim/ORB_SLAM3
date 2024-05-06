@@ -2423,12 +2423,23 @@ void Tracking::Track()
             std::chrono::steady_clock::time_point time_StartNewKF = std::chrono::steady_clock::now();
 #endif
             bool bNeedKF = NeedNewKeyFrame();
+            isKeyframe = false;
+            spMapPoints = set<MapPoint*>();
 
             // Check if we need to insert a new keyframe
             // if(bNeedKF && bOK)
             if(bNeedKF && (bOK || (mInsertKFsLost && mState==RECENTLY_LOST &&
                                    (mSensor == System::IMU_MONOCULAR || mSensor == System::IMU_STEREO || mSensor == System::IMU_RGBD))))
-                CreateNewKeyFrame();
+                isKeyframe = CreateNewKeyFrame();
+                if(isKeyframe){
+                    spMapPoints = mCurrentFrame.mpReferenceKF->GetMapPoints();
+                    // std::cout<<"MapPoints in KF: "<<spMapPoints.size()<<std::endl;
+                    // for(MapPoint* pMP:spMapPoints)
+                    // {
+                    //     std::cout<<pMP->GetWorldPos()<<std::endl;
+                    //     std::cout<<pMP->GetColorRGB()<<std::endl;
+                    // }
+                    }
 
 #ifdef REGISTER_TIMES
             std::chrono::steady_clock::time_point time_EndNewKF = std::chrono::steady_clock::now();
@@ -2850,6 +2861,8 @@ void Tracking::CreateInitialMapMonocular()
     mState=OK;
 
     initID = pKFcur->mnId;
+    isKeyframe = true;
+    spMapPoints = pKFcur->GetMapPoints();
 }
 
 
@@ -3407,13 +3420,13 @@ bool Tracking::NeedNewKeyFrame()
         return false;
 }
 
-void Tracking::CreateNewKeyFrame()
+bool Tracking::CreateNewKeyFrame()
 {
     if(mpLocalMapper->IsInitializing() && !mpAtlas->isImuInitialized())
-        return;
+        return false;
 
     if(!mpLocalMapper->SetNotStop(true))
-        return;
+        return false;
 
     KeyFrame* pKF = new KeyFrame(mCurrentFrame,mpAtlas->GetCurrentMap(),mpKeyFrameDB);
 
@@ -3532,6 +3545,7 @@ void Tracking::CreateNewKeyFrame()
 
     mnLastKeyFrameId = mCurrentFrame.mnId;
     mpLastKeyFrame = pKF;
+    return true;
 }
 
 void Tracking::SearchLocalPoints()

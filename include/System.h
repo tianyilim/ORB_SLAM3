@@ -201,6 +201,8 @@ public:
     bool isLost();
     bool isFinished();
 
+    bool isKeyFrame();
+
     void ChangeDataset();
 
     float GetImageScale();
@@ -274,6 +276,11 @@ private:
     std::vector<cv::KeyPoint> mTrackedKeyPointsUn;
     std::mutex mMutexState;
     std::vector<Eigen::Matrix4f> mFullTrajectory;
+
+    // Variable to store if last frame was a keyframe
+    bool isKeyframe;
+    // Store MapPoints in the last keyframe
+    set<MapPoint*> spMapPoints;
 
     //
     string mStrLoadAtlasFromFile;

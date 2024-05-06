@@ -322,7 +322,8 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
     mFullTrajectory = mpTracker->mTrajectory;
-
+    isKeyframe = mpTracker->isKeyframe;
+    spMapPoints = mpTracker->spMapPoints;
     return Tcw;
 }
 
@@ -395,6 +396,8 @@ Sophus::SE3f System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
     mFullTrajectory = mpTracker->mTrajectory;
+    isKeyframe = mpTracker->isKeyframe;
+    spMapPoints = mpTracker->spMapPoints;
     return Tcw;
 }
 
@@ -472,6 +475,10 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
     mFullTrajectory = mpTracker->mTrajectory;
+    isKeyframe = mpTracker->isKeyframe;
+    spMapPoints = mpTracker->spMapPoints;
+    // bool isKeyFrame = mpTracker->mCurrentFrame.mpReferenceKF->isBad();
+    // std::cout << "Frame at "<<timestamp<<" Is Keyframe: " << mpTracker->mCurrentFrame.mpReferenceKF << std::endl;
     return Tcw;
 }
 
@@ -507,19 +514,19 @@ vector<Eigen::Matrix<float,7,1>> System::GetMapPoints()
 vector<Eigen::Matrix<float,7,1>> System::GetCurrentMapPoints()
 {
     vector<Eigen::Matrix<float,7,1>> currentMapPoints;
-    Map* pActiveMap = mpAtlas->GetCurrentMap();
+    // Map* pActiveMap = mpAtlas->GetCurrentMap();
 
-    if(!pActiveMap)
-        return currentMapPoints;
+    // if(!pActiveMap)
+    //     return currentMapPoints;
 
-    const vector<MapPoint*> &vpMPs = pActiveMap->GetReferenceMapPoints();
+    // const vector<MapPoint*> &vpMPs = pActiveMap->GetReferenceMapPoints();
 
-    set<MapPoint*> spRefMPs(vpMPs.begin(), vpMPs.end());
+    // set<MapPoint*> spRefMPs(vpMPs.begin(), vpMPs.end());
     
-    if(spRefMPs.empty())
-        return currentMapPoints;
+    // if(spRefMPs.empty())
+    //     return currentMapPoints;
     
-    for(set<MapPoint*>::iterator sit=spRefMPs.begin(), send=spRefMPs.end(); sit!=send; sit++)
+    for(set<MapPoint*>::iterator sit=spMapPoints.begin(), send=spMapPoints.end(); sit!=send; sit++)
     {
         Eigen::Matrix<float,7,1> mp;
         if((*sit)->isBad())
@@ -1515,6 +1522,11 @@ bool System::isLost()
 bool System::isFinished()
 {
     return (GetTimeFromIMUInit()>0.1);
+}
+
+bool System::isKeyFrame()
+{
+    return isKeyframe;
 }
 
 void System::ChangeDataset()

@@ -142,6 +142,11 @@ public:
     Frame mCurrentFrame;
     Frame mLastFrame;
 
+    // Variable to store if last frame was a keyframe
+    bool isKeyframe;
+    // Store MapPoints in the last keyframe
+    set<MapPoint*> spMapPoints;
+
     cv::Mat mImGray;
     cv::Mat mImRGB;
 
@@ -227,7 +232,7 @@ protected:
     void SearchLocalPoints();
 
     bool NeedNewKeyFrame();
-    void CreateNewKeyFrame();
+    bool CreateNewKeyFrame();
 
     // Perform preintegration from last frame
     void PreintegrateIMU();
