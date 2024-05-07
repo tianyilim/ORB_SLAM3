@@ -321,7 +321,10 @@ Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, 
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-    mFullTrajectory = mpTracker->mTrajectory;
+    // mFullTrajectory = mpTracker->mTrajectory;
+    // assignment operator is thorwing exception when compiled in release mode
+    mFullTrajectory.clear();
+    copy(mpTracker->mTrajectory.begin(), mpTracker->mTrajectory.end(), back_inserter(mFullTrajectory));
     isKeyframe = mpTracker->isKeyframe;
     spMapPoints = mpTracker->spMapPoints;
     return Tcw;
@@ -395,7 +398,10 @@ Sophus::SE3f System::TrackRGBD(const cv::Mat &im, const cv::Mat &depthmap, const
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-    mFullTrajectory = mpTracker->mTrajectory;
+    // mFullTrajectory = mpTracker->mTrajectory;
+    // assignment operator is thorwing exception when compiled in release mode
+    mFullTrajectory.clear();
+    copy(mpTracker->mTrajectory.begin(), mpTracker->mTrajectory.end(), back_inserter(mFullTrajectory));
     isKeyframe = mpTracker->isKeyframe;
     spMapPoints = mpTracker->spMapPoints;
     return Tcw;
@@ -474,7 +480,10 @@ Sophus::SE3f System::TrackMonocular(const cv::Mat &im, const double &timestamp, 
     mTrackingState = mpTracker->mState;
     mTrackedMapPoints = mpTracker->mCurrentFrame.mvpMapPoints;
     mTrackedKeyPointsUn = mpTracker->mCurrentFrame.mvKeysUn;
-    mFullTrajectory = mpTracker->mTrajectory;
+    // mFullTrajectory = mpTracker->mTrajectory;
+    // assignment operator is thorwing exception when compiled in release mode
+    mFullTrajectory.clear();
+    copy(mpTracker->mTrajectory.begin(), mpTracker->mTrajectory.end(), back_inserter(mFullTrajectory));
     isKeyframe = mpTracker->isKeyframe;
     spMapPoints = mpTracker->spMapPoints;
     // bool isKeyFrame = mpTracker->mCurrentFrame.mpReferenceKF->isBad();

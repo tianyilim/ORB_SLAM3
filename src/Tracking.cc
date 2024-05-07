@@ -1969,7 +1969,8 @@ void Tracking::GetTrajectory()
 
     }
 
-    mTrajectory = vPoses;
+    mTrajectory.clear();
+    copy(vPoses.begin(), vPoses.end(), back_inserter(mTrajectory));
 }
 
 void Tracking::Track()
