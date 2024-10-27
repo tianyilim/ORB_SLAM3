@@ -25,6 +25,7 @@
 #include<opencv2/core/core.hpp>
 
 #include<System.h>
+#include<memUsage.h>
 
 using namespace std;
 
@@ -33,10 +34,22 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
 
 int main(int argc, char **argv)
 {
-    if(argc != 4)
+    if(argc < 4)
     {
-        cerr << endl << "Usage: ./stereo_kitti path_to_vocabulary path_to_settings path_to_sequence" << endl;
+        cerr << endl << "Usage: ./stereo_kitti path_to_vocabulary path_to_settings path_to_sequence run_realtime" << endl;
         return 1;
+    }
+
+    bool bRealTime = false;
+
+    if (argc == 5 && std::stoi(argv[4]) == 1)
+    {
+        cout << "Running in realtime mode" << endl;
+        bRealTime = true;
+    }
+    else
+    {
+        cout << "Running in non-realtime mode. Will not initialize viewer." << endl;
     }
 
     // Retrieve paths to images
@@ -48,19 +61,24 @@ int main(int argc, char **argv)
     const int nImages = vstrImageLeft.size();
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::STEREO,true);
+    ORB_SLAM3::System SLAM(argv[1],argv[2],ORB_SLAM3::System::STEREO,bRealTime);
     float imageScale = SLAM.GetImageScale();
 
     // Vector for tracking time statistics
     vector<float> vTimesTrack;
     vTimesTrack.resize(nImages);
 
+    vector<double> vTimesKeyframes;
+    vector<int> vMemUsageKeyframes;
+
     cout << endl << "-------" << endl;
     cout << "Start processing sequence ..." << endl;
-    cout << "Images in the sequence: " << nImages << endl << endl;   
+    cout << "Images in the sequence: " << nImages << endl << endl;
 
-    double t_track = 0.f;
-    double t_resize = 0.f;
+    #ifdef REGISTER_TIMES
+        double t_track = 0.f;
+        double t_resize = 0.f;
+    #endif
 
     // Main loop
     cv::Mat imLeft, imRight;
@@ -122,19 +140,29 @@ int main(int argc, char **argv)
         SLAM.InsertTrackTime(t_track);
 #endif
 
-        double ttrack= std::chrono::duration_cast<std::chrono::duration<double> >(t2 - t1).count();
+        // Time in seconds
+        double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
 
         vTimesTrack[ni]=ttrack;
 
+        // Log memory
+        if (SLAM.isKeyFrame())
+        {
+            vTimesKeyframes.push_back(ttrack);
+            vMemUsageKeyframes.push_back(memUsage::getMemUsageKB());
+        }
+
         // Wait to load the next frame
         double T=0;
-        if(ni<nImages-1)
+        if(ni < nImages-1)
             T = vTimestamps[ni+1]-tframe;
-        else if(ni>0)
+        else if(ni > 0)
             T = tframe-vTimestamps[ni-1];
 
-        if(ttrack<T)
+        if (bRealTime && ttrack < T)
+        {
             usleep((T-ttrack)*1e6);
+        }
     }
 
     // Stop all threads
@@ -153,6 +181,10 @@ int main(int argc, char **argv)
 
     // Save camera trajectory
     SLAM.SaveTrajectoryKITTI("CameraTrajectory.txt");
+
+    // Save keyframe statistics
+    memUsage::dumpVectorToFile(vTimesKeyframes, "KeyframeTrackTiming.txt");
+    memUsage::dumpVectorToFile(vMemUsageKeyframes, "KeyframeMemUsageKB.txt");
 
     return 0;
 }
@@ -191,4 +223,6 @@ void LoadImages(const string &strPathToSequence, vector<string> &vstrImageLeft,
         vstrImageLeft[i] = strPrefixLeft + ss.str() + ".png";
         vstrImageRight[i] = strPrefixRight + ss.str() + ".png";
     }
+
+    cout << "Done loading images.\n";
 }
