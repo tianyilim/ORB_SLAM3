@@ -27,7 +27,8 @@
 
 #include<mutex>
 #include<thread>
-
+// Reads environment var to check if we should enable / disable LC detection
+#include<cstdlib>
 
 namespace ORB_SLAM3
 {
@@ -74,6 +75,22 @@ LoopClosing::LoopClosing(Atlas *pAtlas, KeyFrameDatabase *pDB, ORBVocabulary *pV
     mstrFolderSubTraj = "SubTrajectories/";
     mnNumCorrection = 0;
     mnCorrectionGBA = 0;
+
+    // Read environment variable to check if we should enable / disable LC detection
+    if (const char* env_p = std::getenv("ORBSLAM3_LC_ON")){
+        std::string lcEnv(env_p);
+        // Convert to lower case for comparison
+        std::transform(lcEnv.begin(), lcEnv.end(), lcEnv.begin(),
+            [](unsigned char c){ return std::tolower(c); });
+        if (lcEnv == "0" || lcEnv == "false"){
+            mbActiveLC = false;
+        }
+    }
+    else {mbActiveLC = false;}
+
+    if (!mbActiveLC){
+        cout << "[LoopClosing.cc] WARNING: Currently, Loop Closure is DISABLED. Are you sure?" << endl;
+    }
 }
 
 void LoopClosing::SetTracker(Tracking *pTracker)
@@ -393,7 +410,9 @@ bool LoopClosing::NewDetectCommonRegions()
             mvpLoopMatchedMPs = vpMatchedMPs;
 
 
-            mbLoopDetected = mnLoopNumCoincidences >= 3;
+            // TODO disable LC
+            mbLoopDetected = false;
+            // mbLoopDetected = mnLoopNumCoincidences >= 3;
             mnLoopNumNotFound = 0;
 
             if(!mbLoopDetected)
@@ -441,7 +460,8 @@ bool LoopClosing::NewDetectCommonRegions()
             mg2oMergeSlw = gScw;
             mvpMergeMatchedMPs = vpMatchedMPs;
 
-            mbMergeDetected = mnMergeNumCoincidences >= 3;
+            // mbMergeDetected = mnMergeNumCoincidences >= 3;
+            mbMergeDetected = false;
         }
         else
         {
@@ -504,12 +524,15 @@ bool LoopClosing::NewDetectCommonRegions()
     //Loop candidates
     if(!bLoopDetectedInKF && !vpLoopBowCand.empty())
     {
-        mbLoopDetected = DetectCommonRegionsFromBoW(vpLoopBowCand, mpLoopMatchedKF, mpLoopLastCurrentKF, mg2oLoopSlw, mnLoopNumCoincidences, mvpLoopMPs, mvpLoopMatchedMPs);
+        // TODO remove LC
+        // mbLoopDetected = DetectCommonRegionsFromBoW(vpLoopBowCand, mpLoopMatchedKF, mpLoopLastCurrentKF, mg2oLoopSlw, mnLoopNumCoincidences, mvpLoopMPs, mvpLoopMatchedMPs);
+        mbLoopDetected = false;
     }
     // Merge candidates
     if(!bMergeDetectedInKF && !vpMergeBowCand.empty())
     {
-        mbMergeDetected = DetectCommonRegionsFromBoW(vpMergeBowCand, mpMergeMatchedKF, mpMergeLastCurrentKF, mg2oMergeSlw, mnMergeNumCoincidences, mvpMergeMPs, mvpMergeMatchedMPs);
+        // mbMergeDetected = DetectCommonRegionsFromBoW(vpMergeBowCand, mpMergeMatchedKF, mpMergeLastCurrentKF, mg2oMergeSlw, mnMergeNumCoincidences, mvpMergeMPs, mvpMergeMatchedMPs);
+        mbMergeDetected = false;
     }
 
 #ifdef REGISTER_TIMES
